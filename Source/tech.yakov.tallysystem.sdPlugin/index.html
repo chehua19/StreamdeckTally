@@ -1,0 +1,189 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+	<title>com.elgato.numberdisplay</title>
+	<meta charset="utf-8" />
+</head>
+
+<body>
+	<script>
+		var websocket = null;
+		var pluginUUID = null;
+		var settingsCache = {};
+		
+		const cameraIdMap = new Map();
+		const socketsMap = new Map();
+
+		var DestinationEnum = Object.freeze({ "HARDWARE_AND_SOFTWARE": 0, "HARDWARE_ONLY": 1, "SOFTWARE_ONLY": 2 })
+
+		var numberdisplayAction = {
+
+			type: "com.elgato.numberdisplay.action",
+
+			onKeyDown: function (context, settings, coordinates, userDesiredState) { },
+
+			onKeyUp: function (context, settings, coordinates, userDesiredState) { },
+
+			onWillAppear: function (context, settings, coordinates) {
+				updatedSettings = {};
+				updatedSettings["cameraId"] = cameraIdMap.get(context);
+				
+				this.SetSettings(context, updatedSettings);
+			},
+
+			SetSettings: function (context, settings) {
+				var json = {
+					"event": "setSettings",
+					"context": context,
+					"payload": settings
+				};
+
+				websocket.send(JSON.stringify(json));
+			},
+		};
+
+		function connectElgatoStreamDeckSocket(inPort, inPluginUUID, inRegisterEvent, inInfo) {
+			pluginUUID = inPluginUUID
+
+			// Open the web socket
+			websocket = new WebSocket("ws://127.0.0.1:" + inPort);
+
+			function registerPlugin(inPluginUUID) {
+				var json = {
+					"event": inRegisterEvent,
+					"uuid": inPluginUUID
+				};
+				websocket.send(JSON.stringify(json));
+			};
+
+			websocket.onopen = function () {
+				registerPlugin(pluginUUID);
+			};
+
+			websocket.onmessage = function (evt) {
+				// Received message from Stream Deck
+				var jsonObj = JSON.parse(evt.data);
+				var event = jsonObj['event'];
+				var action = jsonObj['action'];
+				var context = jsonObj['context'];
+				var jsonPayload = jsonObj['payload'] || {};
+
+				if (event == "willDisappear") {
+					let settings = jsonPayload["settings"];
+					if (settings.hasOwnProperty("serverIp")){
+						let socket = socketsMap.get(context);
+						socket.close();
+					}
+				}
+				
+				if (event == "propertyInspectorDidAppear") {
+					updatedSettings = {};
+					let currentCameraId = cameraIdMap.get(context);
+					if (currentCameraId != null){
+						updatedSettings["cameraId"] = currentCameraId;
+					}
+
+					let currentWebSocket = socketsMap.get(context);
+					if (currentWebSocket != null){
+						updatedSettings["serverIp"] = currentWebSocket.url.replace("ws://", "").replace("/web-socket", "");
+					}
+					
+					numberdisplayAction.SetSettings(context, updatedSettings);
+				}
+				
+
+				if (event == "sendToPlugin") {
+					setupInputValues(jsonPayload, context);
+				}
+			};
+
+			websocket.onclose = function () {
+				// Websocket is closed
+			};
+		};
+
+		function setupInputValues(jsonPayload, context){
+			if (jsonPayload.hasOwnProperty('cameraId')) {
+				cameraIdMap.set(context, jsonPayload.cameraId);
+			}
+
+			if (jsonPayload.hasOwnProperty('serverIp')) {
+				let socket = socketsMap.get(context);
+				if (socket != null) {
+					socket.close();
+				}
+
+				const tallyWebSocket = new WebSocket("ws://" + jsonPayload.serverIp + "/web-socket");
+					
+				tallyWebSocket.onopen = function (){
+					socketsMap.set(context, tallyWebSocket);
+				};
+
+				tallyWebSocket.onmessage = function (data){
+				let tallyData = JSON.parse(data.data);
+				let loopStop = false;
+
+				cameraIdMap.forEach(function(value, key, map){
+					if(tallyData.id === value && socketsMap.get(key) == tallyWebSocket){
+						let imgPath = '';
+						switch(tallyData.tallyState){
+							case "PRV":
+								imgPath = "actionDefaultImage_preview.png";
+								break;
+
+							case "EMPTY":
+								imgPath = "actionDefaultImage.png";
+								break;
+
+							default:
+								imgPath = "actionDefaultImage_program.png";
+								break;
+							}
+							loadImageAsDataUri(imgPath, function (imgUrl) {
+								var json = {
+									"event": "setImage",
+									"context": key,
+									"payload": {
+										image: imgUrl || "",
+										target: DestinationEnum.HARDWARE_AND_SOFTWARE
+									}
+								};
+								websocket.send(JSON.stringify(json));
+							});
+							loopStop = true;
+						}
+					});
+								
+				};
+
+				tallyWebSocket.onclose = function (code){
+					console.log("Close socket with code: " + code);
+					cameraIdMap.delete(context);					
+				}	
+			}
+		}
+
+
+		function loadImageAsDataUri(url, callback) {
+			var image = new Image();
+
+			image.onload = function () {
+				var canvas = document.createElement("canvas");
+
+				canvas.width = this.naturalWidth;
+				canvas.height = this.naturalHeight;
+
+				var ctx = canvas.getContext("2d");
+				ctx.drawImage(this, 0, 0);
+				callback(canvas.toDataURL("image/png"));
+			};
+
+			image.src = url;
+		};
+
+	</script>
+
+</body>
+
+</html>

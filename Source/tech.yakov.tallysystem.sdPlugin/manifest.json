@@ -1,0 +1,40 @@
+{
+  "Actions": [
+    {
+      "Icon": "actionIcon",
+      "Name": "Tally System",
+      "States": [
+        {
+          "Image": "actionDefaultImage",
+          "TitleAlignment": "middle",
+          "FontSize": "14"
+        }
+      ],
+      "SupportedInMultiActions": false,
+      "Tooltip": "This plugin needs to working tally system with AtemTally project",
+      "UUID": "tech.yakov.tallySystem.action"
+    }
+  ],
+  "SDKVersion": 2,
+  "Author": "Dmytro Yakovenko",
+  "CodePath": "index.html",
+  "Description": "This plugin needs to working tally system with AtemTally project",
+  "Name": "Tally System",
+  "Icon": "pluginIcon",
+  "PropertyInspectorPath": "tally_pi.html",
+  "Version": "0.1",
+  "OS": [
+    {
+      "Platform": "mac",
+      "MinimumVersion": "10.11"
+    },
+    {
+      "Platform": "windows",
+      "MinimumVersion": "10"
+    }
+  ],
+  "Software": 
+    {
+        "MinimumVersion" : "4.1"
+    }
+}

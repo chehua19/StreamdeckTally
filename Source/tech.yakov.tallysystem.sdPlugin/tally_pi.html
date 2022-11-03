@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>tech.yakov.tallySystem PI</title>
+    <link rel="stylesheet" href="sdpi.css">
+</head>
+
+<body>
+    <div class="sdpi-wrapper">
+        
+        <div class="sdpi-item" id="server_id_wrapper">
+            <div class="sdpi-item-label">Server ip</div>
+            <input type="text" class="sdpi-item-value" id="server-ip" value="" placeholder="Enter server ip address" pattern="([0-9]{1,3}(?:\.[0-9]{1,3}){3}|[a-zA-Z]+):([0-9]{4})$">
+            
+        </div>
+        <div class="sdpi-item">
+            <div class="sdpi-item-label"></div>
+            <button class="sdpi-item-value" id="connect-button" onclick="connectToWs()">Connect</button>
+        </div>
+        <div type="select" class="sdpi-item">
+            <div class="sdpi-item-label">Select camera index</div>
+            <select class="sdpi-item-value select" id="cameraSelector" onchange="sendValueToPlugin(Number(event.target.value), 'cameraId')">
+                <option selected value="0">-</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+                <option value="7">7</option>
+                <option value="8">8</option>
+                <option value="9">9</option>
+                <option value="10">10</option>
+                <option value="11">11</option>
+                <option value="12">12</option>
+                <option value="13">13</option>
+                <option value="14">14</option>
+                <option value="15">15</option>
+                <option value="16">16</option>
+                <option value="17">17</option>
+                <option value="18">18</option>
+                <option value="19">19</option>
+                <option value="20">20</option>
+                <option value="21">21</option>
+                <option value="22">22</option>
+                <option value="23">23</option>
+                <option value="24">24</option>
+                <option value="25">25</option>
+                <option value="26">26</option>
+                <option value="27">27</option>
+                <option value="28">28</option>
+                <option value="29">29</option>
+                <option value="30">30</option>
+                <option value="31">31</option>
+                <option value="31">32</option>
+                <option value="33">33</option>
+                <option value="34">34</option>
+                <option value="35">35</option>
+                <option value="36">36</option>
+                <option value="37">37</option>
+                <option value="38">38</option>
+                <option value="39">39</option>
+                <option value="40">40</option>
+            </select>
+        </div>
+    </div>
+
+    <script>
+        var websocket = null,
+        uuid = null,
+        actionInfo = {};
+
+        function connectElgatoStreamDeckSocket(inPort, inUUID, inRegisterEvent, inInfo, inActionInfo) {
+            uuid = inUUID;
+            actionInfo = JSON.parse(inActionInfo);
+            websocket = new WebSocket('ws://localhost:' + inPort);
+
+            websocket.onopen = function () {
+                var json = {
+                    event:  inRegisterEvent,
+                    uuid:   inUUID
+                };
+                websocket.send(JSON.stringify(json));
+            }
+            
+            websocket.onmessage = function (evt) {
+                var jsonObj = JSON.parse(evt.data);
+               
+                if(jsonObj.event == "didReceiveSettings"){
+                    let settings = jsonObj['payload']['settings'];
+                    console.log(settings);
+                    
+                    if (settings.hasOwnProperty('cameraId')) {
+                        document.getElementById("cameraSelector").value = settings['cameraId'];
+                    }
+
+                    if (settings.hasOwnProperty('serverIp')) {
+                        document.getElementById("server-ip").value = settings['serverIp'];
+                    }
+                } 
+                
+            };
+
+            websocket.onclose = function () {
+                console.log("streamdeck socket close")
+            }
+        }
+
+        function sendValueToPlugin(value, param) {
+            if (websocket) {
+                const json = {
+                        "action": actionInfo['action'],
+                        "event": "sendToPlugin",
+                        "context": uuid,
+                        "payload": {
+                            [param] : value
+                        }
+                 };
+                 websocket.send(JSON.stringify(json));
+            }
+        }
+
+        function connectToWs(){
+            const serverIpInput = document.getElementById('server-ip');
+            let ipServer = serverIpInput.value;
+            const regEx = "([0-9]{1,3}(?:\.[0-9]{1,3}){3}|[a-zA-Z]+):([0-9]{4})$"
+            if (ipServer.match(regEx)){
+                sendValueToPlugin(ipServer, 'serverIp');
+            }
+        }
+    </script>
+</body>
+
+</html>
